@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Madlibs</title>
+    <style>
+        
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #ff6600;
+        }
+        form {
+            margin: 20px 0;
+        }
+        form p {
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #ff6600;
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #cc5200;
+        }
+    </style>
+</head>
+<body>
+    <h1>Madlibs</h1>
+    <form id="madlibs-form">
+        <div id="prompts-container">
+            
+        </div>
+        <button type="submit">Submit</button>
+    </form>
+    <div id="story-result" style="display: none;">
+        <h1>Your Story</h1>
+        <p id="story-text"></p>
+    </div>
+    
+    <script>
+       
+        const prompts = ["noun", "verb", "adjective", "adverb", "place", "animal", "person"];
+        const storyTemplate = "Once upon a time in a {{place}}, there was a {{adjective}} {{animal}} who loved to {{verb}} {{adverb}}. Everyone in the {{place}} called it the {{adjective}} {{animal}}. One day, {{person}} came to visit and they became best friends.";
+
+        
+        function generateForm() {
+            const promptsContainer = document.getElementById('prompts-container');
+            prompts.forEach(prompt => {
+                const inputElement = document.createElement('p');
+                inputElement.innerHTML = `${prompt}: <input name="${prompt}" required>`;
+                promptsContainer.appendChild(inputElement);
+            });
+        }
+
+       
+        function generateStory(formValues) {
+            let story = storyTemplate;
+            prompts.forEach(prompt => {
+                const value = formValues.get(prompt);
+                const regex = new RegExp(`{{${prompt}}}`, 'g');
+                story = story.replace(regex, value);
+            });
+            return story;
+        }
+
+        
+        document.getElementById('madlibs-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const story = generateStory(formData);
+
+            document.getElementById('story-text').textContent = story;
+            document.getElementById('story-result').style.display = 'block';
+        });
+
+        
+        generateForm();
+    </script>
+</body>
+</html>
