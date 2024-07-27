@@ -1,0 +1,207 @@
+from random import choice
+import string
+
+
+class Boggle():
+
+    def __init__(self):
+
+        self.words = self.read_dict("words.txt")
+
+    def read_dict(self, dict_path):
+        
+
+        dict_file = open(dict_path)
+        words = [w.strip() for w in dict_file]
+        dict_file.close()
+        return words
+
+    def make_board(self):
+        
+
+        board = []
+
+        for y in range(5):
+            row = [choice(string.ascii_uppercase) for i in range(5)]
+            board.append(row)
+
+        return board
+
+    def check_valid_word(self, board, word):
+        
+
+        word_exists = word in self.words
+        valid_word = self.find(board, word.upper())
+
+        if word_exists and valid_word:
+            result = "ok"
+        elif word_exists and not valid_word:
+            result = "not-on-board"
+        else:
+            result = "not-word"
+
+        return result
+
+    def find_from(self, board, word, y, x, seen):
+       
+
+        if x > 4 or y > 4:
+            return
+
+        if board[y][x] != word[0]:
+            return False
+
+
+        if (y, x) in seen:
+            return False
+
+
+        if len(word) == 1:
+            return True
+
+        seen = seen | {(y, x)}
+
+
+        if y > 0:
+            if self.find_from(board, word[1:], y - 1, x, seen):
+                return True
+
+        if y < 4:
+            if self.find_from(board, word[1:], y + 1, x, seen):
+                return True
+
+        if x > 0:
+            if self.find_from(board, word[1:], y, x - 1, seen):
+                return True
+
+        if x < 4:
+            if self.find_from(board, word[1:], y, x + 1, seen):
+                return True
+
+        # diagonals
+        if y > 0 and x > 0:
+            if self.find_from(board, word[1:], y - 1, x - 1, seen):
+                return True
+
+        if y < 4 and x < 4:
+            if self.find_from(board, word[1:], y + 1, x + 1, seen):
+                return True
+
+        if x > 0 and y < 4:
+            if self.find_from(board, word[1:], y + 1, x - 1, seen):
+                return True
+
+        if x < 4 and y > 0:
+            if self.find_from(board, word[1:], y - 1, x + 1, seen):
+                return True
+
+
+        return False
+
+    def find(self, board, word):
+
+        for y in range(0, 5):
+            for x in range(0, 5):
+                if self.find_from(board, word, y, x, seen=set()):
+                    return True
+
+       
+
+        return False
+
+
+
+{{TIMER}}
+
+class BoggleGame {
+
+  constructor(boardId, secs = 60) {
+    this.secs = secs; // game length
+    this.showTimer();
+
+    this.score = 0;
+    this.words = new Set();
+    this.board = $("#" + boardId);
+
+   
+    this.timer = setInterval(this.tick.bind(this), 1000);
+
+    $(".add-word", this.board).on("submit", this.handleSubmit.bind(this));
+  }
+
+  
+
+  showWord(word) {
+    $(".words", this.board).append($("<li>", { text: word }));
+  }
+
+  showScore() {
+    $(".score", this.board).text(this.score);
+  }
+
+
+  showMessage(msg, cls) {
+    $(".msg", this.board)
+      .text(msg)
+      .removeClass()
+      .addClass(`msg ${cls}`);
+  }
+
+  async handleSubmit(evt) {
+    evt.preventDefault();
+    const $word = $(".word", this.board);
+
+    let word = $word.val();
+    if (!word) return;
+
+    if (this.words.has(word)) {
+      this.showMessage(`Already found ${word}`, "err");
+      return;
+    }
+
+    const resp = await axios.get("/check-word", { params: { word: word }});
+    if (resp.data.result === "not-word") {
+      this.showMessage(`${word} is not a valid English word`, "err");
+    } else if (resp.data.result === "not-on-board") {
+      this.showMessage(`${word} is not a valid word on this board`, "err");
+    } else {
+      this.showWord(word);
+      this.score += word.length;
+      this.showScore();
+      this.words.add(word);
+      this.showMessage(`Added: ${word}`, "ok");
+    }
+
+    $word.val("").focus();
+  }
+
+  /* Update timer in DOM */
+
+  showTimer() {
+    $(".timer", this.board).text(this.secs);
+  }
+
+
+  async tick() {
+    this.secs -= 1;
+    this.showTimer();
+
+    if (this.secs === 0) {
+      clearInterval(this.timer);
+      await this.scoreGame();
+    }
+  }
+
+  async scoreGame() {
+    $(".add-word", this.board).hide();
+    const resp = await axios.post("/post-score", { score: this.score });
+    if (resp.data.brokeRecord) {
+      this.showMessage(`New record: ${this.score}`, "ok");
+    } else {
+      this.showMessage(`Final score: ${this.score}`, "ok");
+    }
+  }
+}
+
+
+
