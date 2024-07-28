@@ -1,0 +1,264 @@
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+
+
+DEFAULT_IMAGE = "https://tinyurl.com/demo-cupcake"
+
+
+class Cupcake(db.Model):
+
+    __tablename__ = "cupcakes"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    flavor = db.Column(db.Text, nullable=False)
+    size = db.Column(db.Text, nullable=False)
+    rating = db.Column(db.Float, nullable=False)
+    image = db.Column(db.Text, nullable=False, default=DEFAULT_IMAGE)
+
+    def to_dict(self):
+
+        return {
+            "id": self.id,
+            "flavor": self.flavor,
+            "rating": self.rating,
+            "size": self.size,
+            "image": self.image,
+        }
+
+
+def connect_db(app):
+
+    db.app = app
+    db.init_app(app)
+app.py
+"""Flask app for Cupcakes"""
+
+from flask import Flask, request, jsonify, render_template
+
+from models import db, connect_db, Cupcake
+
+app = Flask(__name__)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///cupcakes'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = "oh-so-secret"
+
+connect_db(app)
+
+
+@app.route("/")
+def root():
+
+    return render_template("index.html")
+
+
+@app.route("/api/cupcakes")
+def list_cupcakes():
+    """Return all cupcakes in system.
+
+    Returns JSON like:
+        {cupcakes: [{id, flavor, rating, size, image}, ...]}
+    """
+
+    cupcakes = [cupcake.to_dict() for cupcake in Cupcake.query.all()]
+    return jsonify(cupcakes=cupcakes)
+
+
+@app.route("/api/cupcakes", methods=["POST"])
+def create_cupcake():
+    """Add cupcake, and return data about new cupcake.
+
+    Returns JSON like:
+        {cupcake: [{id, flavor, rating, size, image}]}
+    """
+
+    data = request.json
+
+    cupcake = Cupcake(
+        flavor=data['flavor'],
+        rating=data['rating'],
+        size=data['size'],
+        image=data['image'] or None)
+
+    db.session.add(cupcake)
+    db.session.commit()
+
+    # POST requests should return HTTP status of 201 CREATED
+    return (jsonify(cupcake=cupcake.to_dict()), 201)
+
+
+@app.route("/api/cupcakes/<int:cupcake_id>")
+def get_cupcake(cupcake_id):
+    """Return data on specific cupcake.
+
+    Returns JSON like:
+        {cupcake: [{id, flavor, rating, size, image}]}
+    """
+
+    cupcake = Cupcake.query.get_or_404(cupcake_id)
+    return jsonify(cupcake=cupcake.to_dict())
+
+
+@app.route("/api/cupcakes/<int:cupcake_id>", methods=["PATCH"])
+def update_cupcake(cupcake_id):
+    """Update cupcake from data in request. Return updated data.
+
+    Returns JSON like:
+        {cupcake: [{id, flavor, rating, size, image}]}
+    """
+
+    data = request.json
+
+    cupcake = Cupcake.query.get_or_404(cupcake_id)
+
+    cupcake.flavor = data['flavor']
+    cupcake.rating = data['rating']
+    cupcake.size = data['size']
+    cupcake.image = data['image']
+
+    db.session.add(cupcake)
+    db.session.commit()
+
+    return jsonify(cupcake=cupcake.to_dict())
+
+
+@app.route("/api/cupcakes/<int:cupcake_id>", methods=["DELETE"])
+def remove_cupcake(cupcake_id):
+    """Delete cupcake and return confirmation message.
+
+    Returns JSON of {message: "Deleted"}
+    """
+
+    cupcake = Cupcake.query.get_or_404(cupcake_id)
+
+    db.session.delete(cupcake)
+    db.session.commit()
+
+    return jsonify(message="Deleted")
+
+
+
+
+HTML & CSS
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Cupcakes</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1>See all the cupcakes!</h1>
+
+<ul id="cupcakes-list">
+</ul>
+
+<h2>Add a new cupcake!</h2>
+
+<form id="new-cupcake-form">
+  <div>
+    <label for="form-flavor">Flavor: </label>
+    <input name="flavor" id="form-flavor">
+  </div>
+
+  <div>
+    <label for="form-size">Size: </label>
+    <input name="size" id="form-size">
+  </div>
+
+  <div>
+    <label for="form-rating">Rating: </label>
+    <input type="number" name="rating" id="form-rating">
+  </div>
+
+  <div>
+    <label for="form-image">Image: </label>
+    <input name="image" id="form-image">
+  </div>
+
+  <button>Add!</button>
+</form>
+
+<script src="https://unpkg.com/jquery"></script>
+<script src="https://unpkg.com/axios/dist/axios.js"></script>
+<script src="/static/cupcakes.js"></script>
+
+</body>
+</html>
+static/style.css
+.Cupcake-img {
+  max-width: 200px;
+  max-height: 200px;
+}
+
+
+
+JS
+static/cupcakes.js
+const BASE_URL = "http://localhost:5000/api";
+
+
+/** given data about a cupcake, generate html */
+
+function generateCupcakeHTML(cupcake) {
+  return `
+    <div data-cupcake-id=${cupcake.id}>
+      <li>
+        ${cupcake.flavor} / ${cupcake.size} / ${cupcake.rating}
+        <button class="delete-button">X</button>
+      </li>
+      <img class="Cupcake-img"
+            src="${cupcake.image}"
+            alt="(no image provided)">
+    </div>
+  `;
+}
+
+
+
+async function showInitialCupcakes() {
+  const response = await axios.get(`${BASE_URL}/cupcakes`);
+
+  for (let cupcakeData of response.data.cupcakes) {
+    let newCupcake = $(generateCupcakeHTML(cupcakeData));
+    $("#cupcakes-list").append(newCupcake);
+  }
+}
+
+
+$("#new-cupcake-form").on("submit", async function (evt) {
+  evt.preventDefault();
+
+  let flavor = $("#form-flavor").val();
+  let rating = $("#form-rating").val();
+  let size = $("#form-size").val();
+  let image = $("#form-image").val();
+
+  const newCupcakeResponse = await axios.post(`${BASE_URL}/cupcakes`, {
+    flavor,
+    rating,
+    size,
+    image
+  });
+
+  let newCupcake = $(generateCupcakeHTML(newCupcakeResponse.data.cupcake));
+  $("#cupcakes-list").append(newCupcake);
+  $("#new-cupcake-form").trigger("reset");
+});
+
+
+$("#cupcakes-list").on("click", ".delete-button", async function (evt) {
+  evt.preventDefault();
+  let $cupcake = $(evt.target).closest("div");
+  let cupcakeId = $cupcake.attr("data-cupcake-id");
+
+  await axios.delete(`${BASE_URL}/cupcakes/${cupcakeId}`);
+  $cupcake.remove();
+});
+
+
+$(showInitialCupcakes);
